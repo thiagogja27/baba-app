@@ -1,0 +1,8 @@
+{
+  "name": "BabáAgendada - Gestão e Agendamento de Babás",
+  "description": "Sistema simples com login, agenda para clientes marcarem dias e valores com a babá, validação de dias, controle de pagamentos e painel administrativo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
