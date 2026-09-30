@@ -450,11 +450,18 @@ class Database {
     }
 
     // REGRA DE NEGÓCIO ESSENCIAL:
-    // Se a babá já deu OK (status != pending_validation), a cliente NÃO pode alterar!
-    if (schedule.status !== 'pending_validation') {
+    // Se a babá já deu OK (status validated, payment_pending ou paid_confirmed), a cliente NÃO pode alterar!
+    if (schedule.status === 'validated' || schedule.status === 'payment_pending' || schedule.status === 'paid_confirmed') {
       throw new Error(
         'Este agendamento já foi validado pela babá com OK! As alterações estão bloqueadas e não podem mais ser desfeitas.'
       );
+    }
+
+    // Se estava recusada e o cliente alterou, volta para pendente de validação para a babá reavaliar
+    if (schedule.status === 'rejected') {
+      schedule.status = 'pending_validation';
+      schedule.rejectionReason = undefined;
+      schedule.rejectedAt = undefined;
     }
 
     if (updateData.date) schedule.date = updateData.date;
@@ -517,10 +524,10 @@ class Database {
       throw new Error('Você só pode excluir seus próprios agendamentos');
     }
 
-    // REGRA DE NEGÓCIO: Se já validado, não pode excluir/desfazer!
-    if (schedule.status !== 'pending_validation') {
+    // REGRA DE NEGÓCIO: Se já validado/em pagamento/concluído pela babá com OK, não pode excluir/desfazer!
+    if (schedule.status === 'validated' || schedule.status === 'payment_pending' || schedule.status === 'paid_confirmed') {
       throw new Error(
-        'Este agendamento já foi validado pela babá! Não é mais permitido cancelar ou excluir.'
+        'Este agendamento já foi validado pela babá com um OK! Não é mais permitido cancelar ou excluir.'
       );
     }
 
@@ -533,7 +540,9 @@ class Database {
       userRole: 'cliente',
       scheduleId: id,
       action: 'AGENDAMENTO_EXCLUIDO',
-      details: `Cancelou/excluiu agendamento do dia ${schedule.date}`,
+      details: schedule.status === 'rejected'
+        ? `Excluiu solicitação recusada do dia ${schedule.date}`
+        : `Cancelou/excluiu agendamento do dia ${schedule.date}`,
     });
 
     return true;

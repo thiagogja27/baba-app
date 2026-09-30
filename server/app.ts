@@ -412,7 +412,7 @@ app.put('/api/schedules/:id', authMiddleware, (req: AuthenticatedRequest, res) =
       return res.status(403).json({ error: 'Apenas a cliente dona do agendamento pode alterá-lo.' });
     }
 
-    if (schedule.status !== 'pending_validation') {
+    if (schedule.status === 'validated' || schedule.status === 'payment_pending' || schedule.status === 'paid_confirmed') {
       return res.status(403).json({
         error: 'A babá já validou este dia com um OK! As alterações estão bloqueadas e não podem mais ser modificadas ou desfeitas.',
       });
@@ -449,14 +449,14 @@ app.delete('/api/schedules/:id', authMiddleware, (req: AuthenticatedRequest, res
       return res.status(403).json({ error: 'Você não tem permissão para cancelar este agendamento.' });
     }
 
-    if (schedule.status !== 'pending_validation') {
+    if (schedule.status === 'validated' || schedule.status === 'payment_pending' || schedule.status === 'paid_confirmed') {
       return res.status(403).json({
         error: 'A babá já validou este dia com um OK! Não é mais possível cancelar ou desfazer o agendamento.',
       });
     }
 
     db.deleteSchedule(id, schedule.clientId);
-    res.json({ success: true, message: 'Agendamento cancelado com sucesso.' });
+    res.json({ success: true, message: 'Agendamento removido com sucesso.' });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Erro ao cancelar agendamento' });
   }

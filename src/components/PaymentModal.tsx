@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Schedule } from '../types.ts';
+import { formatDateWithWeekdayBR } from '../utils/date.ts';
 import { DollarSign, CheckCircle2, Copy, Check, Calendar, AlertCircle } from 'lucide-react';
 
 interface PaymentModalProps {
@@ -83,7 +84,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <Calendar className="w-4 h-4 text-slate-400" />
                 Dia do Cuidado:
               </span>
-              <strong className="text-slate-800 font-semibold">{schedule.date}</strong>
+              <strong className="text-slate-800 font-semibold">{formatDateWithWeekdayBR(schedule.date)}</strong>
             </div>
 
             <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-200 pb-2">

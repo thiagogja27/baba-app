@@ -124,7 +124,7 @@ export default function App() {
   const handleDeleteSchedule = async (scheduleId: string) => {
     try {
       await api.deleteSchedule(scheduleId);
-      showToast('Agendamento cancelado com sucesso.');
+      showToast('Agendamento removido com sucesso.');
       await loadData();
     } catch (err: any) {
       showToast(err.message, 'error');

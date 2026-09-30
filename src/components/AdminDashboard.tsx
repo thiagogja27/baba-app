@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api.ts';
 import { Schedule, User, AdminMetrics, AuditLog } from '../types.ts';
+import { formatDateBR } from '../utils/date.ts';
 import {
   Shield,
   Calendar,
@@ -268,7 +269,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = () => {
                         <td className="py-3.5 px-4 font-semibold text-slate-800">
                           <div className="flex items-center gap-1.5">
                             <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                            {schedule.date}
+                            {formatDateBR(schedule.date)}
                           </div>
                           <div className="text-[11px] text-slate-400 font-normal">
                             {schedule.startTime} - {schedule.endTime}

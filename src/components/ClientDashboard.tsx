@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Schedule, User } from '../types.ts';
+import { formatDateBR, formatDateWithWeekdayBR } from '../utils/date.ts';
 import {
   Calendar,
   Clock,
@@ -286,7 +287,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                       <div className="space-y-2 mb-4">
                         <div className="flex items-center gap-2 text-slate-800 font-bold text-base">
                           <Calendar className="w-4 h-4 text-rose-500" />
-                          <span>Dia {schedule.date}</span>
+                          <span>{formatDateWithWeekdayBR(schedule.date)}</span>
                           <span className="text-xs font-normal text-slate-500 flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5" />
                             {schedule.startTime} às {schedule.endTime}
@@ -433,7 +434,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
               </h3>
               <p className="text-xs text-slate-500">
                 Deseja realmente remover o agendamento do dia{' '}
-                <strong>{scheduleToCancel.date}</strong> (R$ {scheduleToCancel.dailyRate.toFixed(2)})?
+                <strong>{formatDateBR(scheduleToCancel.date)}</strong> (R$ {scheduleToCancel.dailyRate.toFixed(2)})?
               </p>
             </div>
 

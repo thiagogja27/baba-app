@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Schedule, User } from '../types.ts';
+import { formatDateBR, formatDateWithWeekdayBR } from '../utils/date.ts';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -393,7 +394,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     for (const d of days) {
       const rate = timeMode === 'same' ? Number(commonDailyRate) : Number(d.dailyRate);
       if (isNaN(rate) || rate <= 0) {
-        setError(`O valor da diária para o dia ${d.date} deve ser maior que zero.`);
+        setError(`O valor da diária para o dia ${formatDateBR(d.date)} deve ser maior que zero.`);
         return;
       }
     }
@@ -755,7 +756,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     className="inline-flex items-center gap-1.5 bg-white border border-rose-200 text-rose-800 text-xs px-2.5 py-1 rounded-xl shadow-2xs"
                   >
                     <CalendarIcon className="w-3 h-3 text-rose-500" />
-                    <strong>{formatWeekday(d.date)}</strong> ({d.date.split('-').slice(1).reverse().join('/')})
+                    <strong>{formatDateWithWeekdayBR(d.date)}</strong>
                     {days.length > 1 && !scheduleToEdit && (
                       <button
                         type="button"
@@ -885,7 +886,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       <div className="font-bold text-xs text-slate-800">
                         {formatWeekday(d.date)}
                       </div>
-                      <div className="text-[10px] text-slate-400 font-mono">{d.date}</div>
+                      <div className="text-[11px] text-slate-500 font-medium">{formatDateBR(d.date)}</div>
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 flex-1">

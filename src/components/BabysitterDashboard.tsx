@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Schedule, User } from '../types.ts';
+import { formatDateBR, formatDateWithWeekdayBR } from '../utils/date.ts';
 import {
   Calendar,
   Clock,
@@ -179,7 +180,7 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1.5 font-bold text-slate-900">
                           <Calendar className="w-4 h-4 text-rose-500" />
-                          Dia: {schedule.date}
+                          {formatDateWithWeekdayBR(schedule.date)}
                         </span>
                         <span className="flex items-center gap-1 text-slate-500">
                           <Clock className="w-3.5 h-3.5" /> {schedule.startTime} às {schedule.endTime}
@@ -268,7 +269,7 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
                         {schedule.clientName}
                       </h3>
                       <div className="text-xs text-slate-500">
-                        Dia do Cuidado: <strong>{schedule.date}</strong>
+                        Dia do Cuidado: <strong>{formatDateWithWeekdayBR(schedule.date)}</strong>
                       </div>
                     </div>
                     <div className="text-right">
@@ -335,7 +336,7 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs text-emerald-900 flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-emerald-600" /> Dia {schedule.date}
+                      <Lock className="w-3 h-3 text-emerald-600" /> {formatDateWithWeekdayBR(schedule.date)}
                     </span>
                     <span className="font-extrabold text-sm text-emerald-800">
                       R$ {schedule.dailyRate.toFixed(2)}
@@ -369,7 +370,7 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
           <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
             {rejectedSchedules.map(schedule => (
               <div key={schedule.id} className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
-                <div className="font-bold text-slate-700">Dia {schedule.date}</div>
+                <div className="font-bold text-slate-700">{formatDateWithWeekdayBR(schedule.date)}</div>
                 <div className="text-slate-500">Cliente: {schedule.clientName}</div>
                 {schedule.rejectionReason && (
                   <div className="text-[11px] text-rose-600 italic">
@@ -427,7 +428,7 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
               {/* Schedule Summary Box */}
               <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
                 <div className="flex justify-between font-bold text-slate-800 text-sm">
-                  <span>Dia: {confirmModal.schedule.date}</span>
+                  <span>Dia: {formatDateWithWeekdayBR(confirmModal.schedule.date)}</span>
                   <span className="text-emerald-700">R$ {confirmModal.schedule.dailyRate.toFixed(2)}</span>
                 </div>
                 <div className="text-slate-600">
