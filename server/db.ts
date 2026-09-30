@@ -573,6 +573,70 @@ class Database {
     return true;
   }
 
+  // Permite à babá (ou cliente/admin) apagar do histórico um agendamento já pago
+  deletePaidSchedule(id: string, user: User): boolean {
+    const schedule = this.getScheduleById(id);
+    if (!schedule) throw new Error('Agendamento não encontrado');
+
+    const isBabysitter =
+      schedule.babysitterId === user.id ||
+      (schedule.babysitterEmail && schedule.babysitterEmail.toLowerCase() === user.email.toLowerCase()) ||
+      schedule.babysitterName.toLowerCase() === user.name.toLowerCase();
+
+    if (!isBabysitter && schedule.clientId !== user.id && user.role !== 'admin') {
+      throw new Error('Você não tem permissão para apagar este agendamento pago');
+    }
+
+    if (schedule.status !== 'paid_confirmed') {
+      throw new Error('Apenas agendamentos com pagamento já confirmado podem ser apagados por esta função.');
+    }
+
+    this.data.schedules = this.data.schedules.filter(s => s.id !== id);
+    this.save();
+
+    this.addAuditLog({
+      userId: user.id,
+      userName: user.name,
+      userRole: user.role,
+      scheduleId: id,
+      action: 'HISTORICO_PAGO_APAGADO',
+      details: `${user.name} apagou do histórico o agendamento já pago do dia ${schedule.date} (R$ ${schedule.dailyRate.toFixed(2)} - Cliente: ${schedule.clientName}).`,
+    });
+
+    return true;
+  }
+
+  // Limpa agendamentos já pagos em lote
+  clearPaidSchedules(babysitterUser: User, clientId?: string): number {
+    const isBabysitterMatch = (s: Schedule) =>
+      s.babysitterId === babysitterUser.id ||
+      (s.babysitterEmail && s.babysitterEmail.toLowerCase() === babysitterUser.email.toLowerCase()) ||
+      s.babysitterName.toLowerCase() === babysitterUser.name.toLowerCase() ||
+      babysitterUser.role === 'admin';
+
+    const initialCount = this.data.schedules.length;
+    this.data.schedules = this.data.schedules.filter(s => {
+      if (s.status !== 'paid_confirmed') return true;
+      if (!isBabysitterMatch(s)) return true;
+      if (clientId && clientId !== 'all' && s.clientId !== clientId) return true;
+      return false; // remove this paid schedule
+    });
+
+    const removedCount = initialCount - this.data.schedules.length;
+    if (removedCount > 0) {
+      this.save();
+      this.addAuditLog({
+        userId: babysitterUser.id,
+        userName: babysitterUser.name,
+        userRole: 'baba',
+        action: 'HISTORICO_PAGOS_LIMPO',
+        details: `Babá apagou ${removedCount} agendamento(s) já pago(s) do histórico ${clientId && clientId !== 'all' ? `do cliente ${clientId}` : 'geral'}.`,
+      });
+    }
+
+    return removedCount;
+  }
+
   // A babá valida o dia com OK (trava alterações pela cliente)
   validateSchedule(id: string, babysitterUser: User, validateEntirePackage = false): Schedule {
     const schedule = this.getScheduleById(id);

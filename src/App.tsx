@@ -209,6 +209,17 @@ export default function App() {
     }
   };
 
+  // Limpar histórico de pagamentos recebidos (Babá)
+  const handleClearPaidSchedules = async (clientId?: string) => {
+    try {
+      const res = await api.clearPaidSchedules(clientId);
+      showToast(res.message || 'Valores já pagos apagados com sucesso!', 'success');
+      await loadData();
+    } catch (err: any) {
+      showToast(err.message, 'error');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans antialiased text-slate-800">
       {/* Toast Notification */}
@@ -291,6 +302,8 @@ export default function App() {
                 onValidateSchedule={handleValidateSchedule}
                 onRejectSchedule={handleRejectSchedule}
                 onConfirmPayment={handleConfirmPaymentReceived}
+                onDeleteSchedule={handleDeleteSchedule}
+                onClearPaidSchedules={handleClearPaidSchedules}
               />
             )}
 

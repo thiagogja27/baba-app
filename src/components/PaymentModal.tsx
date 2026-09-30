@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Schedule } from '../types.ts';
-import { formatDateWithWeekdayBR } from '../utils/date.ts';
-import { DollarSign, CheckCircle2, Copy, Check, Calendar, AlertCircle, Package } from 'lucide-react';
+import { formatDateWithWeekdayBR, calculateHoursDuration } from '../utils/date.ts';
+import { DollarSign, CheckCircle2, Copy, Check, Calendar, AlertCircle, Package, Clock } from 'lucide-react';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -113,6 +113,16 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 Dia do Cuidado:
               </span>
               <strong className="text-slate-800 font-semibold">{formatDateWithWeekdayBR(schedule.date)}</strong>
+            </div>
+
+            <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-200 pb-2">
+              <span className="flex items-center gap-1.5 font-medium">
+                <Clock className="w-4 h-4 text-slate-400" />
+                Horário & Duração:
+              </span>
+              <strong className="text-slate-800 font-semibold">
+                {schedule.startTime} às {schedule.endTime} ({calculateHoursDuration(schedule.startTime, schedule.endTime)})
+              </strong>
             </div>
 
             <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-200 pb-2">

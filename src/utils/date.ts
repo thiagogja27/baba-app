@@ -44,3 +44,34 @@ export function formatDateTimeBR(isoString: string): string {
     return isoString;
   }
 }
+
+export function calculateHoursDuration(startTime: string, endTime: string): string {
+  if (!startTime || !endTime) return '';
+  const [sh, sm] = startTime.split(':').map(Number);
+  const [eh, em] = endTime.split(':').map(Number);
+  if (isNaN(sh) || isNaN(sm) || isNaN(eh) || isNaN(em)) return '';
+
+  let startMinutes = sh * 60 + sm;
+  let endMinutes = eh * 60 + em;
+  if (endMinutes < startMinutes) {
+    endMinutes += 24 * 60;
+  }
+  const diff = endMinutes - startMinutes;
+  const hours = Math.floor(diff / 60);
+  const minutes = diff % 60;
+
+  if (hours === 0 && minutes === 0) return '0h';
+  if (minutes === 0) {
+    return hours === 1 ? '1 hora' : `${hours} horas`;
+  }
+  if (hours === 0) {
+    return `${minutes} min`;
+  }
+  return `${hours}h ${minutes}min`;
+}
+
+export function formatScheduleTimeWithHours(startTime: string, endTime: string): string {
+  if (!startTime || !endTime) return '';
+  const duration = calculateHoursDuration(startTime, endTime);
+  return `${startTime} às ${endTime} (${duration})`;
+}

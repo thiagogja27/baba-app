@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Schedule, User } from '../types.ts';
-import { formatDateBR, formatDateWithWeekdayBR } from '../utils/date.ts';
+import { formatDateBR, formatDateWithWeekdayBR, calculateHoursDuration } from '../utils/date.ts';
 import {
   Calendar,
   Clock,
@@ -300,7 +300,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                           <span>{formatDateWithWeekdayBR(schedule.date)}</span>
                           <span className="text-xs font-normal text-slate-500 flex items-center gap-1">
                             <Clock className="w-3.5 h-3.5" />
-                            {schedule.startTime} às {schedule.endTime}
+                            {schedule.startTime} às {schedule.endTime} ({calculateHoursDuration(schedule.startTime, schedule.endTime)})
                           </span>
                         </div>
 

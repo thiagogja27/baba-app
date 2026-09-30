@@ -167,6 +167,13 @@ export const api = {
     });
   },
 
+  async clearPaidSchedules(clientId?: string): Promise<{ success: boolean; removedCount: number; message: string }> {
+    return request<{ success: boolean; removedCount: number; message: string }>('/api/schedules/clear-paid', {
+      method: 'POST',
+      body: JSON.stringify({ clientId }),
+    });
+  },
+
   // Babá valida o dia (dar OK) ou valida o pacote completo
   async validateSchedule(id: string, validateEntirePackage = false): Promise<{ schedule: Schedule; message: string }> {
     return request<{ schedule: Schedule; message: string }>(`/api/schedules/${id}/validate`, {

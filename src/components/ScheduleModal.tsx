@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Schedule, User } from '../types.ts';
-import { formatDateBR, formatDateWithWeekdayBR } from '../utils/date.ts';
+import { formatDateBR, formatDateWithWeekdayBR, calculateHoursDuration } from '../utils/date.ts';
 import {
   Calendar as CalendarIcon,
   ChevronLeft,
@@ -943,6 +943,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     />
                   </div>
                 </div>
+
+                {/* Duration in hours */}
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-700 bg-white/90 p-2.5 rounded-xl border border-rose-100 font-medium">
+                  <Clock className="w-3.5 h-3.5 text-rose-500" />
+                  <span>
+                    Duração no dia: <strong>{calculateHoursDuration(commonStartTime, commonEndTime)}</strong> com o bebê ({commonStartTime} às {commonEndTime})
+                  </span>
+                </div>
               </div>
             ) : timeMode === 'package' ? (
               /* OPTION B: PACOTE FECHADO COM VALOR ÚNICO */
@@ -1010,6 +1018,19 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   </div>
                 </div>
 
+                {/* Duration in hours */}
+                <div className="bg-white/90 p-2.5 rounded-xl border border-indigo-100 flex items-center justify-between text-[11px] text-indigo-900 font-medium">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>
+                      Duração diária: <strong>{calculateHoursDuration(commonStartTime, commonEndTime)}</strong> com o bebê ({commonStartTime} às {commonEndTime})
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md font-bold">
+                    {days.length} dias
+                  </span>
+                </div>
+
                 <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100 flex items-center gap-2 text-[11px] text-slate-600">
                   <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
                   <span>
@@ -1054,6 +1075,9 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                           onChange={e => updateDayField(d.id, 'endTime', e.target.value)}
                           className="w-full px-2 py-1 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-rose-400"
                         />
+                        <span className="block text-[10px] text-slate-500 font-semibold mt-0.5">
+                          {calculateHoursDuration(d.startTime, d.endTime)}
+                        </span>
                       </div>
 
                       <div>
@@ -1097,7 +1121,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     Proposta de Pacote Fechado:
                   </span>
                   <div className="text-[11px] text-indigo-700">
-                    {days.length} dias selecionados • Média de R${' '}
+                    {days.length} dias selecionados ({calculateHoursDuration(commonStartTime, commonEndTime)}/dia) • Média de R${' '}
                     {days.length > 0 ? (Number(packageTotal || 0) / days.length).toFixed(2) : '0.00'}/dia
                   </div>
                 </div>
@@ -1116,7 +1140,10 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
               <div className="text-xs text-emerald-900">
                 <span className="font-bold">Resumo do Agendamento:</span>
                 <div className="text-[11px] text-emerald-700 mt-0.5">
-                  {days.length} diária(s) selecionada(s)
+                  {days.length} diária(s) selecionada(s) •{' '}
+                  {timeMode === 'same'
+                    ? `${calculateHoursDuration(commonStartTime, commonEndTime)} por dia`
+                    : 'horários personalizados'}
                 </div>
               </div>
               <div className="text-right">

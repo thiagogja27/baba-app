@@ -451,20 +451,55 @@ app.delete('/api/schedules/:id', authMiddleware, (req: AuthenticatedRequest, res
       return res.status(404).json({ error: 'Agendamento não encontrado.' });
     }
 
+    // Se já foi pago e confirmado, a babá (ou cliente/admin) pode apagar do histórico para limpar a tela
+    if (schedule.status === 'paid_confirmed') {
+      const isBabysitter =
+        schedule.babysitterId === user.id ||
+        (schedule.babysitterEmail && schedule.babysitterEmail.toLowerCase() === user.email.toLowerCase()) ||
+        schedule.babysitterName.toLowerCase() === user.name.toLowerCase();
+
+      if (isBabysitter || schedule.clientId === user.id || user.role === 'admin') {
+        db.deletePaidSchedule(id, user);
+        return res.json({ success: true, message: 'Agendamento já pago apagado do histórico com sucesso.' });
+      } else {
+        return res.status(403).json({ error: 'Você não tem permissão para apagar este agendamento pago.' });
+      }
+    }
+
+    // Para agendamentos não pagos: apenas o cliente solicitante (ou admin) pode cancelar
     if (schedule.clientId !== user.id && user.role !== 'admin') {
       return res.status(403).json({ error: 'Você não tem permissão para cancelar este agendamento.' });
     }
 
-    if (schedule.status === 'validated' || schedule.status === 'payment_pending' || schedule.status === 'paid_confirmed') {
+    if (schedule.status === 'validated' || schedule.status === 'payment_pending') {
       return res.status(403).json({
-        error: 'A babá já validou este dia com um OK! Não é mais possível cancelar ou desfazer o agendamento.',
+        error: 'A babá já validou este dia com um OK! Não é mais possível cancelar ou desfazer o agendamento antes da conclusão do pagamento.',
       });
     }
 
     db.deleteSchedule(id, schedule.clientId);
     res.json({ success: true, message: 'Agendamento removido com sucesso.' });
   } catch (err: any) {
-    res.status(400).json({ error: err.message || 'Erro ao cancelar agendamento' });
+    res.status(400).json({ error: err.message || 'Erro ao cancelar/remover agendamento' });
+  }
+});
+
+app.post('/api/schedules/clear-paid', authMiddleware, (req: AuthenticatedRequest, res) => {
+  try {
+    const user = req.user!;
+    if (user.role !== 'baba' && user.role !== 'admin') {
+      return res.status(403).json({ error: 'Apenas babás ou administradores podem limpar histórico de pagamentos.' });
+    }
+
+    const { clientId } = req.body;
+    const removedCount = db.clearPaidSchedules(user, clientId);
+    res.json({
+      success: true,
+      removedCount,
+      message: `${removedCount} agendamento(s) já pago(s) foram apagados do histórico.`,
+    });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message || 'Erro ao limpar agendamentos pagos' });
   }
 });
 
