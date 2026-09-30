@@ -87,12 +87,21 @@ export default function App() {
     babyName: string;
     babyAge?: string;
     notes?: string;
+    isPackage?: boolean;
+    packageTotal?: number;
   }) => {
     await api.createBatchSchedules(data);
-    showToast(
-      `${data.days.length} dia(s) agendados com sucesso! Aguardando o OK da babá.`,
-      'success'
-    );
+    if (data.isPackage && data.packageTotal) {
+      showToast(
+        `Pacote de ${data.days.length} dias no valor único de R$ ${data.packageTotal.toFixed(2)} enviado! Aguardando o OK da babá.`,
+        'success'
+      );
+    } else {
+      showToast(
+        `${data.days.length} dia(s) agendados com sucesso! Aguardando o OK da babá.`,
+        'success'
+      );
+    }
     setScheduleToEdit(null);
     await loadData();
   };
@@ -131,22 +140,30 @@ export default function App() {
     }
   };
 
-  // Babá valida o dia (dar OK)
-  const handleValidateSchedule = async (scheduleId: string) => {
+  // Babá valida o dia ou pacote
+  const handleValidateSchedule = async (scheduleId: string, validateEntirePackage = false) => {
     try {
-      await api.validateSchedule(scheduleId);
-      showToast('Dia validado com OK! As alterações da cliente foram bloqueadas.');
+      await api.validateSchedule(scheduleId, validateEntirePackage);
+      showToast(
+        validateEntirePackage
+          ? 'Pacote completo validado com OK! Alterações da cliente foram bloqueadas.'
+          : 'Dia validado com OK! As alterações da cliente foram bloqueadas.'
+      );
       await loadData();
     } catch (err: any) {
       showToast(err.message, 'error');
     }
   };
 
-  // Babá recusa o dia
-  const handleRejectSchedule = async (scheduleId: string, reason?: string) => {
+  // Babá recusa o dia ou pacote
+  const handleRejectSchedule = async (scheduleId: string, reason?: string, rejectEntirePackage = false) => {
     try {
-      await api.rejectSchedule(scheduleId, reason);
-      showToast('Solicitação de diária recusada.');
+      await api.rejectSchedule(scheduleId, reason, rejectEntirePackage);
+      showToast(
+        rejectEntirePackage
+          ? 'Proposta do pacote recusada com sucesso.'
+          : 'Solicitação de diária recusada.'
+      );
       await loadData();
     } catch (err: any) {
       showToast(err.message, 'error');
@@ -154,10 +171,23 @@ export default function App() {
   };
 
   // Cliente informa pagamento
-  const handleConfirmReportPayment = async (scheduleId: string, method: string, notes: string) => {
+  const handleConfirmReportPayment = async (
+    scheduleId: string,
+    method: string,
+    notes: string,
+    payEntirePackage = false
+  ) => {
     try {
-      await api.reportPayment(scheduleId, { paymentMethod: method, paymentNotes: notes });
-      showToast('Pagamento informado! Aguardando a babá confirmar na conta.');
+      await api.reportPayment(scheduleId, {
+        paymentMethod: method,
+        paymentNotes: notes,
+        payEntirePackage,
+      });
+      showToast(
+        payEntirePackage
+          ? 'Pagamento do pacote completo informado! Aguardando a babá confirmar.'
+          : 'Pagamento informado! Aguardando a babá confirmar na conta.'
+      );
       await loadData();
     } catch (err: any) {
       showToast(err.message, 'error');
@@ -165,10 +195,14 @@ export default function App() {
   };
 
   // Babá confirma recebimento do pagamento
-  const handleConfirmPaymentReceived = async (scheduleId: string) => {
+  const handleConfirmPaymentReceived = async (scheduleId: string, confirmEntirePackage = false) => {
     try {
-      await api.confirmPayment(scheduleId);
-      showToast('Recebimento do pagamento confirmado com sucesso!');
+      await api.confirmPayment(scheduleId, confirmEntirePackage);
+      showToast(
+        confirmEntirePackage
+          ? 'Recebimento do pacote completo confirmado com sucesso!'
+          : 'Recebimento do pagamento confirmado com sucesso!'
+      );
       await loadData();
     } catch (err: any) {
       showToast(err.message, 'error');

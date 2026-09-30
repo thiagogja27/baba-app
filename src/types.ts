@@ -46,6 +46,10 @@ export interface Schedule {
   paymentNotes?: string | null;
   paymentConfirmedAt?: string | null;
   paymentConfirmedByName?: string | null;
+  packageId?: string | null;
+  isPackage?: boolean | null;
+  packageTotal?: number | null;
+  packageDaysCount?: number | null;
   createdAt: string;
   updatedAt: string;
 }

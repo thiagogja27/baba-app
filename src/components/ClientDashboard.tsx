@@ -14,6 +14,7 @@ import {
   CreditCard,
   Baby,
   Info,
+  Package,
 } from 'lucide-react';
 
 interface ClientDashboardProps {
@@ -237,6 +238,15 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                     }`}
                   >
                     <div>
+                      {schedule.isPackage && (
+                        <div className="mb-2">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-0.5 rounded-lg shadow-2xs">
+                            <Package className="w-3.5 h-3.5 text-indigo-600" />
+                            Pacote Fechado ({schedule.packageDaysCount} dias • R$ {schedule.packageTotal?.toFixed(2)} total)
+                          </span>
+                        </div>
+                      )}
+
                       {/* Status Badge & Value Header */}
                       <div className="flex items-center justify-between gap-2 mb-3">
                         {isPending && (

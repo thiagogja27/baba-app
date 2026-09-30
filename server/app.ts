@@ -379,7 +379,7 @@ app.post('/api/schedules/batch', authMiddleware, (req: AuthenticatedRequest, res
       return res.status(403).json({ error: 'Apenas clientes podem criar agendamentos.' });
     }
 
-    const { babysitterId, days, babyName, babyAge, notes } = req.body;
+    const { babysitterId, days, babyName, babyAge, notes, isPackage, packageTotal } = req.body;
     if (!babysitterId || !Array.isArray(days) || days.length === 0) {
       return res.status(400).json({ error: 'Selecione a babá e pelo menos um dia para agendar.' });
     }
@@ -388,7 +388,13 @@ app.post('/api/schedules/batch', authMiddleware, (req: AuthenticatedRequest, res
       user.id,
       babysitterId,
       days,
-      { babyName, babyAge, notes }
+      {
+        babyName,
+        babyAge,
+        notes,
+        isPackage: Boolean(isPackage),
+        packageTotal: packageTotal !== undefined ? Number(packageTotal) : undefined,
+      }
     );
 
     res.status(201).json({ schedules });
@@ -486,7 +492,8 @@ app.post('/api/schedules/:id/validate', authMiddleware, (req: AuthenticatedReque
       return res.status(400).json({ error: 'Este agendamento já foi validado ou se encontra em outro status.' });
     }
 
-    const updated = db.validateSchedule(id, user);
+    const { validateEntirePackage } = req.body;
+    const updated = db.validateSchedule(id, user, Boolean(validateEntirePackage));
     res.json({ schedule: updated, message: 'Dia validado com sucesso! Alterações da cliente bloqueadas.' });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Erro ao validar agendamento' });
@@ -497,7 +504,7 @@ app.post('/api/schedules/:id/reject', authMiddleware, (req: AuthenticatedRequest
   try {
     const user = req.user!;
     const { id } = req.params;
-    const { reason } = req.body;
+    const { reason, rejectEntirePackage } = req.body;
 
     const schedule = db.getScheduleById(id);
     if (!schedule) {
@@ -518,7 +525,7 @@ app.post('/api/schedules/:id/reject', authMiddleware, (req: AuthenticatedRequest
       return res.status(400).json({ error: 'Apenas agendamentos pendentes de validação podem ser recusados.' });
     }
 
-    const updated = db.rejectSchedule(id, user, reason);
+    const updated = db.rejectSchedule(id, user, reason, Boolean(rejectEntirePackage));
     res.json({ schedule: updated, message: 'Solicitação recusada com sucesso.' });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Erro ao recusar agendamento' });
@@ -529,7 +536,7 @@ app.post('/api/schedules/:id/report-payment', authMiddleware, (req: Authenticate
   try {
     const user = req.user!;
     const { id } = req.params;
-    const { paymentMethod, paymentNotes } = req.body;
+    const { paymentMethod, paymentNotes, payEntirePackage } = req.body;
 
     const schedule = db.getScheduleById(id);
     if (!schedule) {
@@ -549,6 +556,7 @@ app.post('/api/schedules/:id/report-payment', authMiddleware, (req: Authenticate
     const updated = db.reportPayment(id, schedule.clientId, {
       paymentMethod: paymentMethod || 'PIX',
       paymentNotes,
+      payEntirePackage: Boolean(payEntirePackage),
     });
 
     res.json({ schedule: updated, message: 'Pagamento informado! Aguardando confirmação da babá.' });
@@ -561,6 +569,7 @@ app.post('/api/schedules/:id/confirm-payment', authMiddleware, (req: Authenticat
   try {
     const user = req.user!;
     const { id } = req.params;
+    const { confirmEntirePackage } = req.body;
 
     const schedule = db.getScheduleById(id);
     if (!schedule) {
@@ -577,7 +586,7 @@ app.post('/api/schedules/:id/confirm-payment', authMiddleware, (req: Authenticat
       });
     }
 
-    const updated = db.confirmPayment(id, schedule.babysitterId);
+    const updated = db.confirmPayment(id, schedule.babysitterId, Boolean(confirmEntirePackage));
     res.json({ schedule: updated, message: 'Recebimento de pagamento confirmado com sucesso!' });
   } catch (err: any) {
     res.status(400).json({ error: err.message || 'Erro ao confirmar pagamento' });

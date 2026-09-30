@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { Schedule } from '../types.ts';
 import { formatDateWithWeekdayBR } from '../utils/date.ts';
-import { DollarSign, CheckCircle2, Copy, Check, Calendar, AlertCircle } from 'lucide-react';
+import { DollarSign, CheckCircle2, Copy, Check, Calendar, AlertCircle, Package } from 'lucide-react';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   schedule: Schedule | null;
-  onConfirmPayment: (scheduleId: string, paymentMethod: string, notes: string) => Promise<void>;
+  onConfirmPayment: (
+    scheduleId: string,
+    paymentMethod: string,
+    notes: string,
+    payEntirePackage?: boolean
+  ) => Promise<void>;
 }
 
 export const PaymentModal: React.FC<PaymentModalProps> = ({
@@ -18,6 +23,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const [method, setMethod] = useState('PIX');
   const [notes, setNotes] = useState('');
+  const [payEntirePackage, setPayEntirePackage] = useState(true);
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +43,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
     setError(null);
     setLoading(true);
     try {
-      await onConfirmPayment(schedule.id, method, notes);
+      await onConfirmPayment(schedule.id, method, notes, Boolean(schedule.isPackage && payEntirePackage));
       onClose();
     } catch (err: any) {
       setError(err.message || 'Erro ao informar pagamento');
@@ -78,7 +84,29 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           )}
 
           {/* Details summary */}
-          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2">
+          <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 space-y-2.5">
+            {schedule.isPackage && (
+              <div className="bg-indigo-50 border border-indigo-200/80 p-3 rounded-xl space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-indigo-900 flex items-center gap-1.5">
+                    <Package className="w-4 h-4 text-indigo-600" /> Pacote Fechado ({schedule.packageDaysCount} dias)
+                  </span>
+                  <span className="font-black text-indigo-950 text-sm">
+                    R$ {schedule.packageTotal?.toFixed(2)}
+                  </span>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer text-[11px] text-indigo-800 font-medium pt-1 border-t border-indigo-200/60">
+                  <input
+                    type="checkbox"
+                    checked={payEntirePackage}
+                    onChange={e => setPayEntirePackage(e.target.checked)}
+                    className="rounded text-indigo-600 focus:ring-indigo-400"
+                  />
+                  <span>Informar pagamento do <strong>Pacote Completo</strong> (todos os {schedule.packageDaysCount} dias)</span>
+                </label>
+              </div>
+            )}
+
             <div className="flex items-center justify-between text-xs text-slate-500 border-b border-slate-200 pb-2">
               <span className="flex items-center gap-1.5 font-medium">
                 <Calendar className="w-4 h-4 text-slate-400" />
@@ -93,9 +121,11 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
 
             <div className="flex items-center justify-between pt-1">
-              <span className="text-xs font-semibold text-slate-700">Valor Acordado da Diária:</span>
+              <span className="text-xs font-semibold text-slate-700">
+                {schedule.isPackage && payEntirePackage ? 'Valor Total do Pacote:' : 'Valor da Diária:'}
+              </span>
               <span className="text-xl font-extrabold text-emerald-700">
-                R$ {schedule.dailyRate.toFixed(2)}
+                R$ {(schedule.isPackage && payEntirePackage ? (schedule.packageTotal || schedule.dailyRate) : schedule.dailyRate).toFixed(2)}
               </span>
             </div>
           </div>

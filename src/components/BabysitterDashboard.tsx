@@ -15,14 +15,15 @@ import {
   XCircle,
   X,
   MessageSquare,
+  Package,
 } from 'lucide-react';
 
 interface BabysitterDashboardProps {
   user: User;
   schedules: Schedule[];
-  onValidateSchedule: (scheduleId: string) => Promise<void>;
-  onRejectSchedule: (scheduleId: string, reason?: string) => Promise<void>;
-  onConfirmPayment: (scheduleId: string) => Promise<void>;
+  onValidateSchedule: (scheduleId: string, validateEntirePackage?: boolean) => Promise<void>;
+  onRejectSchedule: (scheduleId: string, reason?: string, rejectEntirePackage?: boolean) => Promise<void>;
+  onConfirmPayment: (scheduleId: string, confirmEntirePackage?: boolean) => Promise<void>;
 }
 
 export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
@@ -38,6 +39,7 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
     schedule: Schedule;
   } | null>(null);
 
+  const [applyToPackage, setApplyToPackage] = useState(true);
   const [rejectReason, setRejectReason] = useState('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -57,17 +59,20 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
 
   const handleOpenValidate = (schedule: Schedule) => {
     setActionError(null);
+    setApplyToPackage(true);
     setConfirmModal({ type: 'validate', schedule });
   };
 
   const handleOpenReject = (schedule: Schedule) => {
     setActionError(null);
     setRejectReason('');
+    setApplyToPackage(true);
     setConfirmModal({ type: 'reject', schedule });
   };
 
   const handleOpenConfirmPay = (schedule: Schedule) => {
     setActionError(null);
+    setApplyToPackage(true);
     setConfirmModal({ type: 'confirm_pay', schedule });
   };
 
@@ -76,13 +81,15 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
     setActionLoading(true);
     setActionError(null);
 
+    const isPackageAction = Boolean(confirmModal.schedule.isPackage && applyToPackage);
+
     try {
       if (confirmModal.type === 'validate') {
-        await onValidateSchedule(confirmModal.schedule.id);
+        await onValidateSchedule(confirmModal.schedule.id, isPackageAction);
       } else if (confirmModal.type === 'reject') {
-        await onRejectSchedule(confirmModal.schedule.id, rejectReason.trim() || undefined);
+        await onRejectSchedule(confirmModal.schedule.id, rejectReason.trim() || undefined, isPackageAction);
       } else if (confirmModal.type === 'confirm_pay') {
-        await onConfirmPayment(confirmModal.schedule.id);
+        await onConfirmPayment(confirmModal.schedule.id, isPackageAction);
       }
       setConfirmModal(null);
     } catch (err: any) {
@@ -155,6 +162,15 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
                   className="bg-amber-50/30 border-2 border-amber-300/80 rounded-2xl p-5 space-y-4 hover:border-amber-400 transition-colors flex flex-col justify-between"
                 >
                   <div className="space-y-3">
+                    {schedule.isPackage && (
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2.5 py-1 rounded-xl shadow-2xs">
+                          <Package className="w-3.5 h-3.5 text-indigo-600" />
+                          Proposta de Pacote Fechado ({schedule.packageDaysCount} dias • R$ {schedule.packageTotal?.toFixed(2)} total)
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-start justify-between">
                       <div>
                         <span className="text-xs font-semibold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
@@ -262,9 +278,17 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="text-xs font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-md">
-                        Pagamento Informado
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs font-semibold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-md">
+                          Pagamento Informado
+                        </span>
+                        {schedule.isPackage && (
+                          <span className="text-[11px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                            <Package className="w-3 h-3 text-indigo-600" />
+                            Pacote ({schedule.packageDaysCount} dias)
+                          </span>
+                        )}
+                      </div>
                       <h3 className="font-bold text-slate-800 text-base mt-1">
                         {schedule.clientName}
                       </h3>
@@ -351,6 +375,11 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
                   <div className="text-[10px] text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded text-center font-medium">
                     OK confirmado • Aguardando pagamento
                   </div>
+                  {schedule.isPackage && (
+                    <div className="text-[10px] text-indigo-700 font-bold bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded text-center flex items-center justify-center gap-1">
+                      <Package className="w-3 h-3" /> Pacote ({schedule.packageDaysCount} dias • R$ {schedule.packageTotal?.toFixed(2)})
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -441,6 +470,44 @@ export const BabysitterDashboard: React.FC<BabysitterDashboardProps> = ({
                   Bebê: {confirmModal.schedule.babyName} {confirmModal.schedule.babyAge ? `(${confirmModal.schedule.babyAge})` : ''}
                 </div>
               </div>
+
+              {/* Package Action Option */}
+              {confirmModal.schedule.isPackage && (
+                <div className="bg-indigo-50 border border-indigo-200/90 p-3.5 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-indigo-600" /> Pacote Fechado ({confirmModal.schedule.packageDaysCount} dias)
+                    </span>
+                    <span className="font-black text-indigo-900 text-sm">
+                      Total R$ {confirmModal.schedule.packageTotal?.toFixed(2)}
+                    </span>
+                  </div>
+                  <label className="flex items-start gap-2.5 cursor-pointer text-xs text-indigo-900 font-medium pt-1.5 border-t border-indigo-200/60">
+                    <input
+                      type="checkbox"
+                      checked={applyToPackage}
+                      onChange={e => setApplyToPackage(e.target.checked)}
+                      className="mt-0.5 rounded text-indigo-600 focus:ring-indigo-400"
+                    />
+                    <div>
+                      <span className="font-bold block">
+                        {confirmModal.type === 'validate'
+                          ? `Dar OK no Pacote Completo (${confirmModal.schedule.packageDaysCount} dias)`
+                          : confirmModal.type === 'confirm_pay'
+                          ? `Confirmar recebimento do Pacote Completo (R$ ${confirmModal.schedule.packageTotal?.toFixed(2)})`
+                          : `Recusar o Pacote Completo (${confirmModal.schedule.packageDaysCount} dias)`}
+                      </span>
+                      <span className="text-[11px] text-indigo-700 block mt-0.5">
+                        {confirmModal.type === 'validate'
+                          ? `Valida e bloqueia todos os ${confirmModal.schedule.packageDaysCount} dias contratados neste pacote fechado.`
+                          : confirmModal.type === 'confirm_pay'
+                          ? `Confirma o recebimento de todas as diárias deste pacote de uma só vez.`
+                          : `Recusa todas as datas desta proposta de pacote.`}
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              )}
 
               {confirmModal.type === 'validate' && (
                 <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs text-emerald-900 leading-relaxed">

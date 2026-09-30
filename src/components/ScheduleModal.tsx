@@ -15,6 +15,7 @@ import {
   Check,
   Sparkles,
   RotateCcw,
+  Package,
 } from 'lucide-react';
 
 export interface DayItem {
@@ -39,6 +40,8 @@ interface ScheduleModalProps {
     babyName: string;
     babyAge?: string;
     notes?: string;
+    isPackage?: boolean;
+    packageTotal?: number;
   }) => Promise<void>;
   onSubmitSingle?: (data: {
     babysitterId: string;
@@ -89,14 +92,15 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [babyAge, setBabyAge] = useState('');
   const [notes, setNotes] = useState('');
 
-  // Mode: "same" (mesmo horário e valor para todos) or "individual" (personalizado por dia)
-  const [timeMode, setTimeMode] = useState<'same' | 'individual'>('same');
+  // Mode: "same" (diária padrão), "package" (pacote com valor único fechado) ou "individual" (personalizado)
+  const [timeMode, setTimeMode] = useState<'same' | 'package' | 'individual'>('same');
+  const [packageTotal, setPackageTotal] = useState<number | string>(750);
 
   // Calendar Selection Style: "individual" (clicar nos dias) or "range" (período de check-in a check-out)
   const [calendarMode, setCalendarMode] = useState<'individual' | 'range'>('individual');
   const [rangeStart, setRangeStart] = useState<string | null>(null);
 
-  // Global settings for "same" mode
+  // Global settings for "same" and "package" mode
   const [commonStartTime, setCommonStartTime] = useState('08:00');
   const [commonEndTime, setCommonEndTime] = useState('17:00');
   const [commonDailyRate, setCommonDailyRate] = useState<number | string>(180);
@@ -371,10 +375,14 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     );
   };
 
-  const totalInvestment = days.reduce(
-    (acc, d) => acc + (timeMode === 'same' ? Number(commonDailyRate) || 0 : Number(d.dailyRate) || 0),
-    0
-  );
+  const totalInvestment =
+    timeMode === 'package'
+      ? Number(packageTotal) || 0
+      : days.reduce(
+          (acc, d) =>
+            acc + (timeMode === 'same' ? Number(commonDailyRate) || 0 : Number(d.dailyRate) || 0),
+          0
+        );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -387,6 +395,46 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
     if (days.length === 0) {
       setError('Selecione pelo menos um dia no calendário.');
+      return;
+    }
+
+    // Submissão de Pacote de Dias com Valor Único Fechado
+    if (timeMode === 'package' && !scheduleToEdit) {
+      if (days.length < 2) {
+        setError('Para contratar um pacote com valor único fechado, selecione pelo menos 2 dias no calendário.');
+        return;
+      }
+      const pkgNum = Number(packageTotal);
+      if (isNaN(pkgNum) || pkgNum <= 0) {
+        setError('O valor único do pacote deve ser maior que zero.');
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const perDay = Number((pkgNum / days.length).toFixed(2));
+        const payloadDays = days.map(d => ({
+          date: d.date,
+          startTime: commonStartTime,
+          endTime: commonEndTime,
+          dailyRate: perDay,
+        }));
+
+        await onSubmitBatch({
+          babysitterId,
+          days: payloadDays,
+          babyName: babyName || clientUser.babyName || 'Bebê',
+          babyAge,
+          notes,
+          isPackage: true,
+          packageTotal: pkgNum,
+        });
+        onClose();
+      } catch (err: any) {
+        setError(err.message || 'Erro ao enviar pacote para a babá.');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -428,6 +476,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           babyName: babyName || clientUser.babyName || 'Bebê',
           babyAge,
           notes,
+          isPackage: false,
         });
       }
       onClose();
@@ -781,7 +830,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 Horários e Valores das Diárias:
               </label>
 
-              <div className="flex items-center bg-slate-100 p-0.5 rounded-xl text-[11px] font-semibold self-start sm:self-auto">
+              <div className="flex flex-wrap items-center bg-slate-100 p-1 rounded-xl text-[11px] font-semibold gap-1 self-start sm:self-auto">
                 <button
                   type="button"
                   onClick={() => setTimeMode('same')}
@@ -791,8 +840,32 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  {scheduleToEdit ? 'Replicar para todos os dias' : 'Mesmo para todos os dias'}
+                  {scheduleToEdit ? 'Replicar para todos os dias' : 'Diária Padrão (R$/dia)'}
                 </button>
+
+                {!scheduleToEdit && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTimeMode('package');
+                      if (days.length > 0 && (!packageTotal || Number(packageTotal) <= 0)) {
+                        setPackageTotal(days.length * (Number(commonDailyRate) || 180));
+                      }
+                    }}
+                    className={`px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 ${
+                      timeMode === 'package'
+                        ? 'bg-indigo-600 text-white shadow-2xs font-bold'
+                        : 'text-indigo-600 hover:text-indigo-900 hover:bg-indigo-50/70'
+                    }`}
+                  >
+                    <Package className="w-3.5 h-3.5" />
+                    <span>Pacote (Valor Único)</span>
+                    <span className="text-[9px] bg-amber-300 text-slate-900 font-extrabold px-1.5 py-0.2 rounded-full uppercase tracking-wider">
+                      Novo
+                    </span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setTimeMode('individual')}
@@ -819,7 +892,7 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     </span>
                   ) : (
                     <span>
-                      Horários e valor aplicados para todos os {days.length} dia(s) selecionados no calendário:
+                      Horários e valor por diária aplicados para todos os {days.length} dia(s) selecionados no calendário:
                     </span>
                   )}
                 </div>
@@ -869,6 +942,79 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-rose-400 font-bold text-emerald-700"
                     />
                   </div>
+                </div>
+              </div>
+            ) : timeMode === 'package' ? (
+              /* OPTION B: PACOTE FECHADO COM VALOR ÚNICO */
+              <div className="bg-gradient-to-br from-indigo-50/80 via-purple-50/40 to-rose-50/40 border border-indigo-200 rounded-2xl p-4 space-y-3.5 shadow-2xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-indigo-100 pb-2.5">
+                  <div className="space-y-0.5">
+                    <span className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md">
+                      <Package className="w-3.5 h-3.5" /> Pacote de Dias Fechado • Valor Único
+                    </span>
+                    <p className="text-xs text-slate-600">
+                      Você define um único valor total para todo o período de <strong>{days.length} dias</strong>.
+                    </p>
+                  </div>
+
+                  <div className="self-start sm:self-auto bg-white/90 border border-indigo-100 px-3 py-1.5 rounded-xl shadow-2xs text-right">
+                    <span className="text-[10px] text-slate-400 block font-medium">Equivalente por diária:</span>
+                    <span className="text-xs font-black text-indigo-700">
+                      R$ {days.length > 0 ? (Number(packageTotal || 0) / days.length).toFixed(2) : '0.00'} / dia
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" /> Horário Início
+                    </label>
+                    <input
+                      type="time"
+                      value={commonStartTime}
+                      onChange={e =>
+                        handleCommonTimeChange(e.target.value, commonEndTime, commonDailyRate)
+                      }
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1 flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5 text-slate-400" /> Horário Término
+                    </label>
+                    <input
+                      type="time"
+                      value={commonEndTime}
+                      onChange={e =>
+                        handleCommonTimeChange(commonStartTime, e.target.value, commonDailyRate)
+                      }
+                      className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-400 font-medium"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-indigo-900 mb-1 flex items-center gap-1">
+                      <DollarSign className="w-3.5 h-3.5 text-indigo-600" /> Valor Único do Pacote (R$)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="1"
+                      value={packageTotal}
+                      onChange={e => setPackageTotal(e.target.value)}
+                      placeholder="Ex: 600.00"
+                      className="w-full px-3 py-2 text-xs bg-white border-2 border-indigo-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-black text-indigo-900 shadow-xs"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-white/80 p-2.5 rounded-xl border border-indigo-100 flex items-center gap-2 text-[11px] text-slate-600">
+                  <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
+                  <span>
+                    A babá receberá sua proposta como um <strong>Pacote Fechado de {days.length} dias por R$ {Number(packageTotal || 0).toFixed(2)}</strong>. Ao dar OK, ela valida o pacote completo.
+                  </span>
                 </div>
               </div>
             ) : (
@@ -940,22 +1086,49 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
           </div>
 
           {/* Total investment summary */}
-          <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
-            <div className="text-xs text-emerald-900">
-              <span className="font-bold">Resumo do Agendamento:</span>
-              <div className="text-[11px] text-emerald-700 mt-0.5">
-                {days.length} diária(s) selecionada(s)
+          {timeMode === 'package' && !scheduleToEdit ? (
+            <div className="bg-indigo-50/90 border border-indigo-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-xs">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <span className="font-bold text-xs text-indigo-950 block">
+                    Proposta de Pacote Fechado:
+                  </span>
+                  <div className="text-[11px] text-indigo-700">
+                    {days.length} dias selecionados • Média de R${' '}
+                    {days.length > 0 ? (Number(packageTotal || 0) / days.length).toFixed(2) : '0.00'}/dia
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-indigo-600 block uppercase font-bold tracking-wider">
+                  Valor Único Total
+                </span>
+                <span className="text-xl font-black text-indigo-900">
+                  R$ {Number(packageTotal || 0).toFixed(2)}
+                </span>
               </div>
             </div>
-            <div className="text-right">
-              <span className="text-[10px] text-emerald-600 block uppercase font-bold tracking-wider">
-                Investimento Total
-              </span>
-              <span className="text-xl font-black text-emerald-800">
-                R$ {totalInvestment.toFixed(2)}
-              </span>
+          ) : (
+            <div className="bg-emerald-50/80 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between">
+              <div className="text-xs text-emerald-900">
+                <span className="font-bold">Resumo do Agendamento:</span>
+                <div className="text-[11px] text-emerald-700 mt-0.5">
+                  {days.length} diária(s) selecionada(s)
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] text-emerald-600 block uppercase font-bold tracking-wider">
+                  Investimento Total
+                </span>
+                <span className="text-xl font-black text-emerald-800">
+                  R$ {totalInvestment.toFixed(2)}
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Baby Info */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4">
@@ -1013,7 +1186,11 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             <button
               type="submit"
               disabled={loading || days.length === 0}
-              className="flex-2 py-2.5 px-4 text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 disabled:opacity-50 rounded-xl shadow-md shadow-rose-500/25 transition-all flex items-center justify-center gap-1.5"
+              className={`flex-2 py-2.5 px-4 text-xs font-bold text-white rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 ${
+                timeMode === 'package' && !scheduleToEdit
+                  ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/25'
+                  : 'bg-rose-500 hover:bg-rose-600 shadow-rose-500/25'
+              } disabled:opacity-50`}
             >
               {loading
                 ? 'Enviando...'
@@ -1021,6 +1198,8 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 ? timeMode === 'same'
                   ? 'Salvar e Replicar para Todos os Dias'
                   : 'Atualizar Apenas Este Dia'
+                : timeMode === 'package'
+                ? `Enviar Pacote de ${days.length} Dias (R$ ${Number(packageTotal || 0).toFixed(2)})`
                 : `Enviar ${days.length} Dia(s) para a Babá`}
             </button>
           </div>

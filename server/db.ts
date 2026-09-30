@@ -51,6 +51,10 @@ export interface Schedule {
   paymentNotes?: string | null;
   paymentConfirmedAt?: string | null;
   paymentConfirmedByName?: string | null;
+  packageId?: string | null;
+  isPackage?: boolean | null;
+  packageTotal?: number | null;
+  packageDaysCount?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -382,12 +386,27 @@ class Database {
       babyName?: string;
       babyAge?: string;
       notes?: string;
+      isPackage?: boolean;
+      packageTotal?: number;
     }
   ): Schedule[] {
     const client = this.getUserById(clientId);
     const babysitter = this.getUserById(babysitterId);
     if (!client) throw new Error('Cliente não encontrado');
     if (!babysitter) throw new Error('Babá não encontrada');
+
+    const isPackage = Boolean(
+      common.isPackage &&
+      common.packageTotal &&
+      Number(common.packageTotal) > 0 &&
+      days.length > 1
+    );
+    const packageId = isPackage ? `pkg_${crypto.randomUUID().slice(0, 8)}` : null;
+    const packageTotal = isPackage ? Number(common.packageTotal) : null;
+    const packageDaysCount = isPackage ? days.length : null;
+
+    // Se for pacote de valor único, divide o valor proporcionalmente entre as diárias
+    const perDayRate = isPackage && packageTotal ? Number((packageTotal / days.length).toFixed(2)) : null;
 
     const created: Schedule[] = [];
     for (const d of days) {
@@ -403,11 +422,15 @@ class Database {
         date: d.date,
         startTime: d.startTime || '08:00',
         endTime: d.endTime || '17:00',
-        dailyRate: Number(d.dailyRate) || 0,
+        dailyRate: perDayRate !== null ? perDayRate : (Number(d.dailyRate) || 0),
         babyName: common.babyName || client.babyName || 'Bebê',
         babyAge: common.babyAge || client.babyAge || '',
         notes: common.notes || '',
         status: 'pending_validation',
+        packageId,
+        isPackage,
+        packageTotal,
+        packageDaysCount,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -421,8 +444,10 @@ class Database {
       userId: client.id,
       userName: client.name,
       userRole: 'cliente',
-      action: 'AGENDAMENTO_LOTE_CRIADO',
-      details: `Solicitou ${days.length} dias com a babá ${babysitter.name}.`,
+      action: isPackage ? 'PACOTE_CRIADO' : 'AGENDAMENTO_LOTE_CRIADO',
+      details: isPackage
+        ? `Solicitou PACOTE de ${days.length} dias por um valor único de R$ ${packageTotal?.toFixed(2)} fechado com a babá ${babysitter.name}.`
+        : `Solicitou ${days.length} dias com a babá ${babysitter.name}.`,
     });
 
     return created;
@@ -549,7 +574,7 @@ class Database {
   }
 
   // A babá valida o dia com OK (trava alterações pela cliente)
-  validateSchedule(id: string, babysitterUser: User): Schedule {
+  validateSchedule(id: string, babysitterUser: User, validateEntirePackage = false): Schedule {
     const schedule = this.getScheduleById(id);
     if (!schedule) throw new Error('Agendamento não encontrado');
 
@@ -567,11 +592,25 @@ class Database {
       throw new Error('Este agendamento já foi validado ou se encontra em outro status');
     }
 
+    const now = new Date().toISOString();
     schedule.babysitterId = babysitterUser.id;
     schedule.status = 'validated';
-    schedule.validatedAt = new Date().toISOString();
+    schedule.validatedAt = now;
     schedule.validatedByName = babysitterUser.name;
-    schedule.updatedAt = new Date().toISOString();
+    schedule.updatedAt = now;
+
+    if (validateEntirePackage && schedule.packageId) {
+      const packageOthers = this.data.schedules.filter(
+        s => s.packageId === schedule.packageId && s.id !== schedule.id && s.status === 'pending_validation'
+      );
+      for (const other of packageOthers) {
+        other.babysitterId = babysitterUser.id;
+        other.status = 'validated';
+        other.validatedAt = now;
+        other.validatedByName = babysitterUser.name;
+        other.updatedAt = now;
+      }
+    }
 
     this.save();
 
@@ -581,14 +620,16 @@ class Database {
       userRole: 'baba',
       scheduleId: schedule.id,
       action: 'AGENDAMENTO_VALIDADO_BABA',
-      details: `Babá deu OK no agendamento do dia ${schedule.date} (R$ ${schedule.dailyRate.toFixed(2)}). As alterações da cliente foram bloqueadas com sucesso.`,
+      details: validateEntirePackage && schedule.isPackage
+        ? `Babá deu OK no PACOTE COMPLETO (${schedule.packageDaysCount} dias • R$ ${schedule.packageTotal?.toFixed(2)}).`
+        : `Babá deu OK no agendamento do dia ${schedule.date} (R$ ${schedule.dailyRate.toFixed(2)}). As alterações da cliente foram bloqueadas com sucesso.`,
     });
 
     return schedule;
   }
 
   // A babá recusa a solicitação
-  rejectSchedule(id: string, babysitterUser: User, reason?: string): Schedule {
+  rejectSchedule(id: string, babysitterUser: User, reason?: string, rejectEntirePackage = false): Schedule {
     const schedule = this.getScheduleById(id);
     if (!schedule) throw new Error('Agendamento não encontrado');
 
@@ -606,11 +647,27 @@ class Database {
       throw new Error('Apenas agendamentos pendentes podem ser recusados');
     }
 
+    const now = new Date().toISOString();
+    const finalReason = reason || 'Indisponibilidade de horário';
+
     schedule.babysitterId = babysitterUser.id;
     schedule.status = 'rejected';
-    schedule.rejectedAt = new Date().toISOString();
-    schedule.rejectionReason = reason || 'Indisponibilidade de horário';
-    schedule.updatedAt = new Date().toISOString();
+    schedule.rejectedAt = now;
+    schedule.rejectionReason = finalReason;
+    schedule.updatedAt = now;
+
+    if (rejectEntirePackage && schedule.packageId) {
+      const packageOthers = this.data.schedules.filter(
+        s => s.packageId === schedule.packageId && s.id !== schedule.id && s.status === 'pending_validation'
+      );
+      for (const other of packageOthers) {
+        other.babysitterId = babysitterUser.id;
+        other.status = 'rejected';
+        other.rejectedAt = now;
+        other.rejectionReason = finalReason;
+        other.updatedAt = now;
+      }
+    }
 
     this.save();
 
@@ -620,7 +677,9 @@ class Database {
       userRole: 'baba',
       scheduleId: schedule.id,
       action: 'AGENDAMENTO_RECUSADO_BABA',
-      details: `Babá recusou a solicitação para o dia ${schedule.date}. Motivo: ${schedule.rejectionReason}`,
+      details: rejectEntirePackage && schedule.isPackage
+        ? `Babá recusou o PACOTE COMPLETO (${schedule.packageDaysCount} dias). Motivo: ${finalReason}`
+        : `Babá recusou a solicitação para o dia ${schedule.date}. Motivo: ${finalReason}`,
     });
 
     return schedule;
@@ -630,7 +689,7 @@ class Database {
   reportPayment(
     id: string,
     clientId: string,
-    paymentDetails: { paymentMethod?: string; paymentNotes?: string }
+    paymentDetails: { paymentMethod?: string; paymentNotes?: string; payEntirePackage?: boolean }
   ): Schedule {
     const schedule = this.getScheduleById(id);
     if (!schedule) throw new Error('Agendamento não encontrado');
@@ -645,11 +704,25 @@ class Database {
       );
     }
 
+    const now = new Date().toISOString();
     schedule.status = 'payment_pending';
-    schedule.paymentReportedAt = new Date().toISOString();
+    schedule.paymentReportedAt = now;
     schedule.paymentMethod = paymentDetails.paymentMethod || 'PIX';
     schedule.paymentNotes = paymentDetails.paymentNotes || 'Pagamento informado pela cliente';
-    schedule.updatedAt = new Date().toISOString();
+    schedule.updatedAt = now;
+
+    if (paymentDetails.payEntirePackage && schedule.packageId) {
+      const packageOthers = this.data.schedules.filter(
+        s => s.packageId === schedule.packageId && s.id !== schedule.id && s.status === 'validated'
+      );
+      for (const other of packageOthers) {
+        other.status = 'payment_pending';
+        other.paymentReportedAt = now;
+        other.paymentMethod = schedule.paymentMethod;
+        other.paymentNotes = schedule.paymentNotes;
+        other.updatedAt = now;
+      }
+    }
 
     this.save();
 
@@ -659,14 +732,16 @@ class Database {
       userRole: 'cliente',
       scheduleId: schedule.id,
       action: 'PAGAMENTO_INFORMADO_CLIENTE',
-      details: `Cliente marcou como pago via ${schedule.paymentMethod} (R$ ${schedule.dailyRate.toFixed(2)}). Aguardando confirmação da babá.`,
+      details: paymentDetails.payEntirePackage && schedule.isPackage
+        ? `Cliente informou pagamento do PACOTE COMPLETO (${schedule.packageDaysCount} dias • R$ ${schedule.packageTotal?.toFixed(2)}) via ${schedule.paymentMethod}.`
+        : `Cliente marcou como pago via ${schedule.paymentMethod} (R$ ${schedule.dailyRate.toFixed(2)}). Aguardando confirmação da babá.`,
     });
 
     return schedule;
   }
 
   // Babá confirma o recebimento do pagamento
-  confirmPayment(id: string, babysitterId: string): Schedule {
+  confirmPayment(id: string, babysitterId: string, confirmEntirePackage = false): Schedule {
     const schedule = this.getScheduleById(id);
     if (!schedule) throw new Error('Agendamento não encontrado');
 
@@ -679,20 +754,37 @@ class Database {
     }
 
     const babysitter = this.getUserById(babysitterId);
+    const now = new Date().toISOString();
+    const confirmedByName = babysitter ? babysitter.name : 'Babá';
+
     schedule.status = 'paid_confirmed';
-    schedule.paymentConfirmedAt = new Date().toISOString();
-    schedule.paymentConfirmedByName = babysitter ? babysitter.name : 'Babá';
-    schedule.updatedAt = new Date().toISOString();
+    schedule.paymentConfirmedAt = now;
+    schedule.paymentConfirmedByName = confirmedByName;
+    schedule.updatedAt = now;
+
+    if (confirmEntirePackage && schedule.packageId) {
+      const packageOthers = this.data.schedules.filter(
+        s => s.packageId === schedule.packageId && s.id !== schedule.id && s.status === 'payment_pending'
+      );
+      for (const other of packageOthers) {
+        other.status = 'paid_confirmed';
+        other.paymentConfirmedAt = now;
+        other.paymentConfirmedByName = confirmedByName;
+        other.updatedAt = now;
+      }
+    }
 
     this.save();
 
     this.addAuditLog({
       userId: babysitterId,
-      userName: schedule.paymentConfirmedByName,
+      userName: confirmedByName,
       userRole: 'baba',
       scheduleId: schedule.id,
       action: 'PAGAMENTO_CONFIRMADO_BABA',
-      details: `Babá confirmou o recebimento integral de R$ ${schedule.dailyRate.toFixed(2)} referente ao dia ${schedule.date}. Ciclo concluído com sucesso.`,
+      details: confirmEntirePackage && schedule.isPackage
+        ? `Babá confirmou o recebimento do PACOTE COMPLETO (${schedule.packageDaysCount} dias • R$ ${schedule.packageTotal?.toFixed(2)}).`
+        : `Babá confirmou o recebimento integral de R$ ${schedule.dailyRate.toFixed(2)} referente ao dia ${schedule.date}. Ciclo concluído com sucesso.`,
     });
 
     return schedule;

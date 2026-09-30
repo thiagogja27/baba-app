@@ -133,6 +133,8 @@ export const api = {
     babyName: string;
     babyAge?: string;
     notes?: string;
+    isPackage?: boolean;
+    packageTotal?: number;
   }): Promise<{ schedules: Schedule[] }> {
     return request<{ schedules: Schedule[] }>('/api/schedules/batch', {
       method: 'POST',
@@ -165,25 +167,30 @@ export const api = {
     });
   },
 
-  // Babá valida o dia (dar OK)
-  async validateSchedule(id: string): Promise<{ schedule: Schedule; message: string }> {
+  // Babá valida o dia (dar OK) ou valida o pacote completo
+  async validateSchedule(id: string, validateEntirePackage = false): Promise<{ schedule: Schedule; message: string }> {
     return request<{ schedule: Schedule; message: string }>(`/api/schedules/${id}/validate`, {
       method: 'POST',
+      body: JSON.stringify({ validateEntirePackage }),
     });
   },
 
-  // Babá recusa a solicitação
-  async rejectSchedule(id: string, reason?: string): Promise<{ schedule: Schedule; message: string }> {
+  // Babá recusa a solicitação ou recusa o pacote completo
+  async rejectSchedule(
+    id: string,
+    reason?: string,
+    rejectEntirePackage = false
+  ): Promise<{ schedule: Schedule; message: string }> {
     return request<{ schedule: Schedule; message: string }>(`/api/schedules/${id}/reject`, {
       method: 'POST',
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason, rejectEntirePackage }),
     });
   },
 
-  // Cliente informa pagamento realizado
+  // Cliente informa pagamento realizado (opcionalmente do pacote completo)
   async reportPayment(
     id: string,
-    payload: { paymentMethod?: string; paymentNotes?: string }
+    payload: { paymentMethod?: string; paymentNotes?: string; payEntirePackage?: boolean }
   ): Promise<{ schedule: Schedule; message: string }> {
     return request<{ schedule: Schedule; message: string }>(`/api/schedules/${id}/report-payment`, {
       method: 'POST',
@@ -191,10 +198,11 @@ export const api = {
     });
   },
 
-  // Babá confirma o recebimento do pagamento
-  async confirmPayment(id: string): Promise<{ schedule: Schedule; message: string }> {
+  // Babá confirma o recebimento do pagamento (opcionalmente do pacote completo)
+  async confirmPayment(id: string, confirmEntirePackage = false): Promise<{ schedule: Schedule; message: string }> {
     return request<{ schedule: Schedule; message: string }>(`/api/schedules/${id}/confirm-payment`, {
       method: 'POST',
+      body: JSON.stringify({ confirmEntirePackage }),
     });
   },
 
