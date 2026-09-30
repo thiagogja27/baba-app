@@ -30,10 +30,20 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     headers,
   });
 
-  const data = await res.json().catch(() => ({}));
+  let data: any = {};
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
 
   if (!res.ok) {
-    throw new Error(data.error || 'Ocorreu um erro na requisição');
+    if (res.status === 404) {
+      throw new Error(
+        'Endpoint da API não encontrado (404). Verifique se o deploy na Vercel foi concluído com as novas rotas.'
+      );
+    }
+    throw new Error(data.error || 'Ocorreu um erro na requisição.');
   }
 
   return data as T;

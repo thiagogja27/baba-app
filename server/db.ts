@@ -93,37 +93,65 @@ function getInitialData(): DatabaseSchema {
   };
 }
 
-const FIREBASE_RTDB_URL = 'https://baba-aebdc-default-rtdb.firebaseio.com';
+function getFirebaseUrl(): string {
+  const url = process.env.VITE_FIREBASE_DATABASE_URL || process.env.FIREBASE_DATABASE_URL || 'https://baba-aebdc-default-rtdb.firebaseio.com';
+  return url.replace(/\/$/, '');
+}
 
 class Database {
   private data: DatabaseSchema;
   private firebaseConnected = false;
+  private isLoaded = false;
+  private loadPromise: Promise<void> | null = null;
 
   constructor() {
-    if (!fs.existsSync(DATA_DIR)) {
-      fs.mkdirSync(DATA_DIR, { recursive: true });
-    }
+    this.data = getInitialData();
+    try {
+      if (!fs.existsSync(DATA_DIR)) {
+        fs.mkdirSync(DATA_DIR, { recursive: true });
+      }
 
-    if (fs.existsSync(DB_FILE)) {
-      try {
-        const raw = fs.readFileSync(DB_FILE, 'utf-8');
-        this.data = JSON.parse(raw);
-      } catch {
+      if (fs.existsSync(DB_FILE)) {
+        try {
+          const raw = fs.readFileSync(DB_FILE, 'utf-8');
+          this.data = JSON.parse(raw);
+        } catch {
+          this.data = getInitialData();
+          this.saveLocal();
+        }
+      } else {
         this.data = getInitialData();
         this.saveLocal();
       }
-    } else {
+    } catch {
+      // In serverless environments (like Vercel), the filesystem is read-only.
       this.data = getInitialData();
-      this.saveLocal();
     }
 
     // Initialize Firebase sync in the background
-    this.initFirebase();
+    this.initFirebase().catch(() => {});
+  }
+
+  public async ensureLoaded(): Promise<void> {
+    if (this.isLoaded && this.data.users.length > 0) return;
+    if (this.loadPromise) return this.loadPromise;
+
+    this.loadPromise = (async () => {
+      await this.initFirebase();
+      this.isLoaded = true;
+    })();
+
+    try {
+      await this.loadPromise;
+    } finally {
+      this.loadPromise = null;
+    }
   }
 
   public async initFirebase() {
     try {
-      const res = await fetch(`${FIREBASE_RTDB_URL}/.json`);
+      const url = getFirebaseUrl();
+      const res = await fetch(`${url}/.json`);
       if (res.ok) {
         const remote = await res.json();
         this.firebaseConnected = true;
@@ -145,10 +173,10 @@ class Database {
             this.saveLocal();
           }
         }
-        console.log('Firebase Realtime Database conectado: baba-aebdc');
+        console.log('Firebase Realtime Database conectado:', url);
       }
     } catch (err) {
-      console.warn('Conexão inicial com Firebase Realtime Database pendente:', err);
+      console.warn('Conexão com Firebase Realtime Database:', err);
     }
   }
 
@@ -157,19 +185,24 @@ class Database {
   }
 
   private saveLocal() {
-    const tmp = `${DB_FILE}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf-8');
-    fs.renameSync(tmp, DB_FILE);
+    try {
+      const tmp = `${DB_FILE}.tmp`;
+      fs.writeFileSync(tmp, JSON.stringify(this.data, null, 2), 'utf-8');
+      fs.renameSync(tmp, DB_FILE);
+    } catch {
+      // Ignore read-only filesystem errors on Vercel/serverless
+    }
   }
 
   private save() {
     this.saveLocal();
-    this.syncToFirebase();
+    this.syncToFirebase().catch(() => {});
   }
 
   private async syncToFirebase() {
     try {
-      const res = await fetch(`${FIREBASE_RTDB_URL}/.json`, {
+      const url = getFirebaseUrl();
+      const res = await fetch(`${url}/.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -177,7 +210,7 @@ class Database {
           schedules: this.data.schedules,
           auditLogs: this.data.auditLogs,
           lastSync: new Date().toISOString(),
-          projectId: 'baba-aebdc',
+          projectId: process.env.VITE_FIREBASE_PROJECT_ID || 'baba-aebdc',
         }),
       });
       if (res.ok) {
